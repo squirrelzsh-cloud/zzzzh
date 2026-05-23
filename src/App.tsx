@@ -54,6 +54,14 @@ export default function App() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const userPausedRef = useRef<boolean>(false);
 
+  // Callback ref: fires as soon as the <audio> DOM node is created — earlier than useEffect
+  const setAudioRef = (el: HTMLAudioElement | null) => {
+    audioRef.current = el;
+    if (el && !userPausedRef.current) {
+      el.play().then(() => setIsPlayingMusic(true)).catch(() => {});
+    }
+  };
+
   // DB Sync Status
   const [isDbLoaded, setIsDbLoaded] = useState<boolean>(false);
 
@@ -324,52 +332,49 @@ export default function App() {
         }
 
         // For each card, resolve IndexedDB Blobs for those prefixed with local:// or blob:
-        // Each card is resolved independently — one failing won't break the others
+        // Default cards with valid /media/ paths always prefer their local file over IndexedDB
         const resolvedMemories = await Promise.all(
           initialMemories.map(async (m) => {
             let resImg = m.imageUrl || "";
             let resVid = m.videoUrl || "";
 
-            if (resImg.startsWith("local://image-") || resImg.startsWith("blob:")) {
+            const defaultMem = CAMPUS_MEMORIES.find(x => x.id === m.id);
+            const defaultImg = defaultMem?.imageUrl || "";
+
+            // If a card has a CAMPUS_MEMORIES default with a /media/ path, always use it
+            if (defaultImg && defaultImg.startsWith("/media/")) {
+              resImg = defaultImg;
+            } else if (resImg.startsWith("local://image-") || resImg.startsWith("blob:")) {
               try {
                 const b = await getMedia(`card-media-${m.id}-image`);
                 if (b && b.size > 0) {
                   resImg = URL.createObjectURL(b);
-                } else {
-                  const originalDefault = CAMPUS_MEMORIES.find(x => x.id === m.id);
-                  resImg = originalDefault?.imageUrl || "";
                 }
-              } catch {
-                const originalDefault = CAMPUS_MEMORIES.find(x => x.id === m.id);
-                resImg = originalDefault?.imageUrl || "";
-              }
+              } catch {}
             }
 
-            // Final safety: if imageUrl is still empty or local://, use default
-            if (!resImg || resImg.startsWith("local://")) {
-              const originalDefault = CAMPUS_MEMORIES.find(x => x.id === m.id);
-              resImg = originalDefault?.imageUrl || "/media/image-m1.jpg";
+            // Final safety
+            if (!resImg) {
+              resImg = defaultImg || "/media/image-m1.jpg";
             }
 
-            if (resVid.startsWith("local://video-") || resVid.startsWith("blob:")) {
+            const defaultVid = defaultMem?.videoUrl || "";
+            if (defaultVid && defaultVid.startsWith("/media/")) {
+              resVid = resVid.startsWith("local://video-") || resVid.startsWith("blob:") ? defaultVid : (resVid || defaultVid);
+            } else if (resVid.startsWith("local://video-") || resVid.startsWith("blob:")) {
               try {
                 const b = await getMedia(`card-media-${m.id}-video`);
                 if (b && b.size > 0) {
                   resVid = URL.createObjectURL(b);
                 } else {
-                  const originalDefault = CAMPUS_MEMORIES.find(x => x.id === m.id);
-                  resVid = originalDefault?.videoUrl || "";
+                  resVid = defaultVid;
                 }
               } catch {
-                const originalDefault = CAMPUS_MEMORIES.find(x => x.id === m.id);
-                resVid = originalDefault?.videoUrl || "";
+                resVid = defaultVid;
               }
             }
 
-            if (resVid.startsWith("local://")) {
-              const originalDefault = CAMPUS_MEMORIES.find(x => x.id === m.id);
-              resVid = originalDefault?.videoUrl || "";
-            }
+            if (!resVid) resVid = defaultVid;
 
             return {
               ...m,
@@ -446,70 +451,37 @@ export default function App() {
         if (audioRef.current) {
           const audio = audioRef.current;
 
-          // Only change src if it differs from what's already set (avoids interrupting playback)
-          const currentSrc = audio.src || "";
-          const needSrcChange = !currentSrc.endsWith(initialMusicUrl.split("/").pop() || "")
-            && initialMusicUrl !== "/media/111.mp3";
-
-          if (needSrcChange || !currentSrc) {
+          // If Firestore returned a different URL, update the src
+          if (initialMusicUrl !== "/media/111.mp3") {
             audio.src = initialMusicUrl;
             audio.load();
           }
 
-          // Setup gesture fallback for browsers that block autoplay
-          const startPlayback = () => {
-            if (userPausedRef.current) return;
+          if (!userPausedRef.current) {
+            // Try playing immediately — browser may allow it if user has engagement history
             audio.play()
               .then(() => {
                 setIsPlayingMusic(true);
-                cleanUpListeners();
               })
-              .catch(() => {});
-          };
-
-          const cleanUpListeners = () => {
-            window.removeEventListener("click", startPlayback);
-            window.removeEventListener("touchstart", startPlayback);
-            window.removeEventListener("wheel", startPlayback);
-            window.removeEventListener("keydown", startPlayback);
-          };
-
-          if (!userPausedRef.current) {
-            // Wait for audio to be ready before attempting play
-            const tryPlay = () => {
-              audio.play()
-                .then(() => {
-                  setIsPlayingMusic(true);
-                  audio.removeEventListener("canplay", tryPlay);
-                  audio.removeEventListener("loadeddata", tryPlay);
-                })
-                .catch(() => {
-                  // Browser blocked autoplay — set up gesture capture
-                  window.addEventListener("click", startPlayback, { passive: true });
-                  window.addEventListener("touchstart", startPlayback, { passive: true });
-                  window.addEventListener("wheel", startPlayback, { passive: true });
-                  window.addEventListener("keydown", startPlayback, { passive: true });
-                  audio.removeEventListener("canplay", tryPlay);
-                  audio.removeEventListener("loadeddata", tryPlay);
-                });
-            };
-
-            if (audio.readyState >= 2) {
-              // Already have enough data
-              tryPlay();
-            } else {
-              audio.addEventListener("canplay", tryPlay, { once: false });
-              audio.addEventListener("loadeddata", tryPlay, { once: false });
-              // Safety timeout: if canplay never fires, try anyway
-              setTimeout(() => {
-                if (!userPausedRef.current && audio.readyState >= 1) {
-                  tryPlay();
-                }
-              }, 2000);
-            }
-
-            // Store cleanup for the init effect's return
-            (audio as any).__cleanupListeners = cleanUpListeners;
+              .catch(() => {
+                // Blocked: wait for first user gesture
+                const onGesture = () => {
+                  if (userPausedRef.current) return;
+                  audio.play()
+                    .then(() => setIsPlayingMusic(true))
+                    .catch(() => {});
+                  window.removeEventListener("click", onGesture);
+                  window.removeEventListener("touchstart", onGesture);
+                  window.removeEventListener("wheel", onGesture);
+                  window.removeEventListener("keydown", onGesture);
+                };
+                window.addEventListener("click", onGesture, { passive: true });
+                window.addEventListener("touchstart", onGesture, { passive: true });
+                window.addEventListener("wheel", onGesture, { passive: true });
+                window.addEventListener("keydown", onGesture, { passive: true });
+                // Store for cleanup
+                (audio as any).__onGesture = onGesture;
+              });
           }
         }
 
@@ -524,8 +496,13 @@ export default function App() {
 
     return () => {
       if (audioRef.current) {
-        const cleanup = (audioRef.current as any).__cleanupListeners;
-        if (cleanup) cleanup();
+        const onGesture = (audioRef.current as any).__onGesture;
+        if (onGesture) {
+          window.removeEventListener("click", onGesture);
+          window.removeEventListener("touchstart", onGesture);
+          window.removeEventListener("wheel", onGesture);
+          window.removeEventListener("keydown", onGesture);
+        }
       }
     };
   }, []);
@@ -1169,10 +1146,11 @@ export default function App() {
       
       {/* Hidden natural standard HTML audio loop */}
       <audio
-        ref={audioRef}
+        ref={setAudioRef}
         src="/media/111.mp3"
         loop
         autoPlay
+        preload="auto"
       />
 
       {/* 1. Cinematic Background Layer */}
