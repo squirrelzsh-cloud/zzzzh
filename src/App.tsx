@@ -393,76 +393,13 @@ export default function App() {
 
         setMemories(resolvedMemories);
 
-        // Step 2: Load Background Audio from Firestore or Local fallback
-        let dbMusic: { name: string; url: string } | null = null;
-        try {
-          const fetchedMusic = await fetchSharedMusicConfig();
-          if (fetchedMusic) {
-            dbMusic = { name: fetchedMusic.name, url: fetchedMusic.url };
-          }
-        } catch (musicErr) {
-          console.error("Failed to fetch music settings from Firestore", musicErr);
-        }
-
-        let initialMusicUrl = "/media/111.mp3";
-        let initialMusicName = "111.mp3";
-
-        if (dbMusic) {
-          initialMusicUrl = dbMusic.url;
-          initialMusicName = dbMusic.name;
-          localStorage.setItem("zsh-music-name", initialMusicName);
-          localStorage.setItem("zsh-music-url", initialMusicUrl);
-          if (initialMusicUrl !== "local") {
-            setCustomBgmUrlInput(initialMusicUrl);
-          }
-        } else {
-          // Load Background Audio from Local DB or Saved URL config as fallback
-          const savedMusicName = localStorage.getItem("zsh-music-name");
-          const savedMusicUrl = localStorage.getItem("zsh-music-url");
-          
-          if (savedMusicUrl) {
-            if (savedMusicUrl === "local") {
-              const savedMusicFile = await getMedia("custom-bg-music");
-              if (savedMusicFile) {
-                initialMusicUrl = URL.createObjectURL(savedMusicFile);
-                if (savedMusicName) initialMusicName = savedMusicName;
-              }
-            } else {
-              initialMusicUrl = savedMusicUrl;
-              if (savedMusicName) initialMusicName = savedMusicName;
-              setCustomBgmUrlInput(savedMusicUrl);
-            }
-          } else {
-            // Compatibility fallback with older versions (Direct IndexedDB load without 'zsh-music-url' key)
-            const savedMusicFile = await getMedia("custom-bg-music");
-            if (savedMusicFile && savedMusicName) {
-              initialMusicUrl = URL.createObjectURL(savedMusicFile);
-              initialMusicName = savedMusicName;
-              localStorage.setItem("zsh-music-url", "local");
-            }
-          }
-
-          // Seed the initial music track to Firestore
-          try {
-            await saveSharedMusicConfig({
-              id: "music",
-              name: initialMusicName,
-              url: initialMusicUrl
-            });
-          } catch (seedMusicErr) {
-            console.error("Failed to seed music config to Firestore", seedMusicErr);
-          }
-        }
-
+        // Step 2: Always use local /media/111.mp3 — never override from Firestore/localStorage
+        const initialMusicUrl = "/media/111.mp3";
+        const initialMusicName = "111.mp3";
         setMusicName(initialMusicName);
+        setCustomBgmUrlInput("");
         if (audioRef.current) {
           const audio = audioRef.current;
-
-          // If Firestore returned a different URL, update the src
-          if (initialMusicUrl !== "/media/111.mp3") {
-            audio.src = initialMusicUrl;
-            audio.load();
-          }
 
           if (!userPausedRef.current) {
             if (!audio.paused) {
