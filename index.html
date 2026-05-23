@@ -7,28 +7,32 @@
   </head>
   <body>
     <div id="root"></div>
-    <!-- Early audio: muted-first autoplay (browsers allow muted, then unmute) -->
+    <!-- Early audio: DOM-attached muted-first autoplay (browsers allow muted, then unmute) -->
     <script>
       (function() {
-        var a = new Audio('/media/111.mp3');
+        var a = document.createElement('audio');
+        a.id = 'bgm-audio';
+        a.src = '/media/111.mp3';
         a.loop = true;
         a.autoplay = true;
         a.preload = 'auto';
         a.muted = true;
         a.volume = parseFloat(localStorage.getItem('zsh-music-volume') || '0.04');
+        a.style.display = 'none';
+        document.body.appendChild(a);
         window.__bgmAudio = a;
         a.play().then(function() {
           a.__playing = true;
-          // Unmute shortly after playback starts — browser allows it once playing
-          setTimeout(function() { a.muted = false; }, 300);
+          // Unmute once playback is stable — browser allows it after muted play starts
+          setTimeout(function() { a.muted = false; }, 500);
         }).catch(function() {
           a.__playing = false;
-          // Even muted play failed (rare, e.g. mobile Safari) — wait for gesture
+          // Even muted play failed (mobile Safari blocks all autoplay) — wait for gesture
           var resume = function() {
             a.muted = true;
             a.play().then(function() {
               a.__playing = true;
-              setTimeout(function() { a.muted = false; }, 300);
+              setTimeout(function() { a.muted = false; }, 500);
             }).catch(function() {});
             document.removeEventListener('click', resume);
             document.removeEventListener('touchstart', resume);

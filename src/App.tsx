@@ -401,7 +401,8 @@ export default function App() {
         if (audioRef.current) {
           const audio = audioRef.current;
           // Belt-and-suspenders: ensure src is always /media/111.mp3
-          if (audio.src !== initialMusicUrl) {
+          // audio.src returns absolute URL, so check path suffix
+          if (!audio.src.includes('/media/111.mp3')) {
             audio.src = initialMusicUrl;
             audio.load();
           }
@@ -410,6 +411,10 @@ export default function App() {
             if (!audio.paused) {
               // Already playing (inline script succeeded)
               setIsPlayingMusic(true);
+              // If still muted after 1s, unmute (belt-and-suspenders for race condition)
+              if (audio.muted) {
+                setTimeout(function() { audio.muted = false; }, 600);
+              }
             } else {
               // Muted-first: browsers allow muted autoplay, then unmute
               audio.muted = true;
@@ -728,6 +733,7 @@ export default function App() {
       setIsPlayingMusic(false);
     } else {
       userPausedRef.current = false;
+      if (audioRef.current.muted) audioRef.current.muted = false;
       audioRef.current.play()
         .then(() => {
           setIsPlayingMusic(true);
