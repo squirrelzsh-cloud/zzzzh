@@ -7,7 +7,32 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Early audio: create and play before React loads to beat browser autoplay blocking -->
+    <script>
+      (function() {
+        var a = new Audio('/media/111.mp3');
+        a.loop = true;
+        a.autoplay = true;
+        a.preload = 'auto';
+        a.volume = parseFloat(localStorage.getItem('zsh-music-volume') || '0.04');
+        window.__bgmAudio = a;
+        a.play().then(function() {
+          a.__playing = true;
+        }).catch(function() {
+          a.__playing = false;
+          // Gesture fallback: play on first touch/click/key
+          var resume = function() {
+            a.play().then(function() { a.__playing = true; }).catch(function() {});
+            document.removeEventListener('click', resume);
+            document.removeEventListener('touchstart', resume);
+            document.removeEventListener('keydown', resume);
+          };
+          document.addEventListener('click', resume, { passive: true });
+          document.addEventListener('touchstart', resume, { passive: true });
+          document.addEventListener('keydown', resume, { passive: true });
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

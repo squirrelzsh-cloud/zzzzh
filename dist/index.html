@@ -4,11 +4,36 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My Google AI Studio App</title>
-    <script type="module" crossorigin src="/assets/index-DN1k60oS.js"></script>
+    <script type="module" crossorigin src="/assets/index-B1AOys7m.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-CNal_AWt.css">
   </head>
   <body>
     <div id="root"></div>
+    <!-- Early audio: create and play before React loads to beat browser autoplay blocking -->
+    <script>
+      (function() {
+        var a = new Audio('/media/111.mp3');
+        a.loop = true;
+        a.autoplay = true;
+        a.preload = 'auto';
+        a.volume = parseFloat(localStorage.getItem('zsh-music-volume') || '0.04');
+        window.__bgmAudio = a;
+        a.play().then(function() {
+          a.__playing = true;
+        }).catch(function() {
+          a.__playing = false;
+          // Gesture fallback: play on first touch/click/key
+          var resume = function() {
+            a.play().then(function() { a.__playing = true; }).catch(function() {});
+            document.removeEventListener('click', resume);
+            document.removeEventListener('touchstart', resume);
+            document.removeEventListener('keydown', resume);
+          };
+          document.addEventListener('click', resume, { passive: true });
+          document.addEventListener('touchstart', resume, { passive: true });
+          document.addEventListener('keydown', resume, { passive: true });
+        });
+      })();
+    </script>
   </body>
 </html>
-

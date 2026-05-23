@@ -1,3 +1,9 @@
+declare global {
+  interface Window {
+    __bgmAudio?: HTMLAudioElement & { __playing?: boolean };
+  }
+}
+
 import React, { useEffect, useRef, useState, ChangeEvent, FormEvent } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { CAMPUS_MEMORIES, COMMEMORATION_STAGES, Memory, Stage } from "./data";
@@ -53,14 +59,6 @@ export default function App() {
   const [musicName, setMusicName] = useState<string>("纪念彼青春 - 钢琴背景曲 (Default)");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const userPausedRef = useRef<boolean>(false);
-
-  // Callback ref: fires as soon as the <audio> DOM node is created — earlier than useEffect
-  const setAudioRef = (el: HTMLAudioElement | null) => {
-    audioRef.current = el;
-    if (el && !userPausedRef.current) {
-      el.play().then(() => setIsPlayingMusic(true)).catch(() => {});
-    }
-  };
 
   // DB Sync Status
   const [isDbLoaded, setIsDbLoaded] = useState<boolean>(false);
@@ -245,6 +243,15 @@ export default function App() {
   useEffect(() => {
     async function initDBAndStorage() {
       try {
+        // Adopt the pre-created global audio from index.html (created before React loads)
+        const bgm = window.__bgmAudio || null;
+        if (bgm) {
+          audioRef.current = bgm;
+          if (bgm.__playing) {
+            setIsPlayingMusic(true);
+          }
+        }
+
         // Step 1: Resolve Memories with Firestore + Local Fallback
         let dbMemories: Memory[] = [];
         try {
@@ -1144,14 +1151,7 @@ export default function App() {
   return (
     <div className="relative min-h-screen w-full bg-black text-stone-100 overflow-hidden font-sans flex flex-col transition-colors duration-1000">
       
-      {/* Hidden natural standard HTML audio loop */}
-      <audio
-        ref={setAudioRef}
-        src="/media/111.mp3"
-        loop
-        autoPlay
-        preload="auto"
-      />
+      {/* Audio is created in index.html via window.__bgmAudio before React loads */}
 
       {/* 1. Cinematic Background Layer */}
       <BackgroundParticles />
