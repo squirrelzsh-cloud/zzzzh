@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default fallback deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidMemory(data) {
+      return data.keys().hasAll(['id', 'title', 'description', 'imageUrl', 'category', 'location'])
+        && data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() <= 200
+        && (!('subTitle' in data) || (data.subTitle is string && data.subTitle.size() <= 200))
+        && data.description is string && data.description.size() <= 2000
+        && (!('date' in data) || (data.date is string && data.date.size() <= 100))
+        && data.imageUrl is string && data.imageUrl.size() <= 3000
+        && (!('videoUrl' in data) || (data.videoUrl is string && data.videoUrl.size() <= 3000))
+        && data.category is string && data.category.size() <= 100
+        && data.location is string && data.location.size() <= 200;
+    }
+
+    function isValidMusicConfig(data) {
+      return data.keys().hasAll(['id', 'name', 'url'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 500
+        && data.url is string && data.url.size() <= 3000;
+    }
+
+    // Matches for our collections
+    match /memories/{memoryId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(memoryId) && isValidMemory(request.resource.data);
+      allow delete: if isValidId(memoryId);
+    }
+
+    match /settings/{settingsId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(settingsId) && isValidMusicConfig(request.resource.data);
+      allow delete: if isValidId(settingsId);
+    }
+  }
+}

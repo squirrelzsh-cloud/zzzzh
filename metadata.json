@@ -1,0 +1,8 @@
+{
+  "name": "Remix: 大学时光纪念册",
+  "description": "一个唯美互动的大学生活照片与视频片段纪念网页，复刻光遇 Valley 阶段的卡片动态空间变换布局",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

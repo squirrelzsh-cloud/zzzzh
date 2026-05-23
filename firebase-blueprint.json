@@ -1,0 +1,44 @@
+{
+  "entities": {
+    "Memory": {
+      "title": "Memory Card",
+      "description": "Represents an individual physical memory card shown on the screen",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "subTitle": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "category": { "type": "string" },
+        "location": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "description", "imageUrl", "category", "location"]
+    },
+    "MusicConfig": {
+      "title": "Music Settings",
+      "description": "Represents global background music configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "url": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "url"]
+    }
+  },
+  "firestore": {
+    "/memories/{memoryId}": {
+      "schema": "Memory",
+      "description": "Individual client-shared memories on the visual wall"
+    },
+    "/settings/{settingsId}": {
+      "schema": "MusicConfig",
+      "description": "Global settings such as custom background tracks"
+    }
+  }
+}
