@@ -1114,10 +1114,11 @@ export default function App() {
     <div className="relative min-h-screen w-full bg-black text-stone-100 overflow-hidden font-sans flex flex-col transition-colors duration-1000">
       
       {/* Hidden natural standard HTML audio loop */}
-      <audio 
-        ref={audioRef} 
-        src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" 
+      <audio
+        ref={audioRef}
+        src="/media/111.mp3"
         loop
+        autoPlay
       />
 
       {/* 1. Cinematic Background Layer */}

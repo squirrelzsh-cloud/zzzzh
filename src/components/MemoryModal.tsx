@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Memory } from "../data";
-import { X, Calendar, MapPin, Heart, Play, Film, Volume2, Sparkles, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Calendar, MapPin, Heart, Play, Film, Volume2, Sparkles, BookOpen, ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
 
 interface MemoryModalProps {
   memory: Memory | null;
@@ -14,12 +14,16 @@ interface MemoryModalProps {
 export function MemoryModal({ memory, isOpen, onClose, onPrev, onNext }: MemoryModalProps) {
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Reset states when memory changes
   useEffect(() => {
     setIsPlayingVideo(false);
+    setImgError(false);
   }, [memory]);
+
+  const hasVideo = memory?.videoUrl && memory.videoUrl.trim() !== "";
 
   if (!memory) return null;
 
@@ -55,7 +59,7 @@ export function MemoryModal({ memory, isOpen, onClose, onPrev, onNext }: MemoryM
           >
             {/* Left Column: Media Display */}
             <div className="relative flex-1 bg-stone-900 flex items-center justify-center overflow-hidden aspect-video md:aspect-auto">
-              {memory.videoUrl ? (
+              {hasVideo ? (
                 <div 
                   className="relative w-full h-full group cursor-pointer"
                   onClick={handleTogglePlay}
@@ -93,15 +97,22 @@ export function MemoryModal({ memory, isOpen, onClose, onPrev, onNext }: MemoryM
                   </div>
                 </div>
               ) : (
-                <div className="relative w-full h-full flex items-center justify-center">
-                  <img
-                    src={memory.imageUrl}
-                    alt={memory.title}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover"
-                  />
+                <div className="relative w-full h-full flex items-center justify-center bg-stone-800">
+                  {imgError ? (
+                    <div className="flex flex-col items-center gap-2 text-stone-400">
+                      <ImageIcon className="w-12 h-12 text-stone-500" />
+                      <span className="font-mono text-[10px] tracking-widest">IMAGE UNAVAILABLE</span>
+                    </div>
+                  ) : (
+                    <img
+                      src={memory.imageUrl}
+                      alt={memory.title}
+                      onError={() => setImgError(true)}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
-                  
+
                   {/* Small ambient overlay */}
                   <div className="absolute bottom-3 left-3 bg-[#1A1A1A]/90 px-3 py-1.5 text-[10px] text-[#B57C50] font-mono flex items-center gap-1.5 rounded-xl tracking-wider">
                     <Sparkles className="w-3.5 h-3.5 animate-pulse text-amber-500" />

@@ -33,8 +33,8 @@ export function MemoryCard({
   const [isLiked, setIsLiked] = useState(false);
   const [floatingHearts, setFloatingHearts] = useState<{ id: number; x: number; scale: number; rotate: number }[]>([]);
 
-  // Determine media badge
-  const hasVideo = !!memory.videoUrl;
+  // Determine media badge — treat empty string as no video
+  const hasVideo = !!(memory.videoUrl && memory.videoUrl.trim() !== "");
 
   const handleSingleClick = (e: MouseEvent) => {
     e.stopPropagation();
