@@ -4,27 +4,34 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My Google AI Studio App</title>
-    <script type="module" crossorigin src="/assets/index-B1AOys7m.js"></script>
+    <script type="module" crossorigin src="/assets/index-B4Woff7Y.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-CNal_AWt.css">
   </head>
   <body>
     <div id="root"></div>
-    <!-- Early audio: create and play before React loads to beat browser autoplay blocking -->
+    <!-- Early audio: muted-first autoplay (browsers allow muted, then unmute) -->
     <script>
       (function() {
         var a = new Audio('/media/111.mp3');
         a.loop = true;
         a.autoplay = true;
         a.preload = 'auto';
+        a.muted = true;
         a.volume = parseFloat(localStorage.getItem('zsh-music-volume') || '0.04');
         window.__bgmAudio = a;
         a.play().then(function() {
           a.__playing = true;
+          // Unmute shortly after playback starts — browser allows it once playing
+          setTimeout(function() { a.muted = false; }, 300);
         }).catch(function() {
           a.__playing = false;
-          // Gesture fallback: play on first touch/click/key
+          // Even muted play failed (rare, e.g. mobile Safari) — wait for gesture
           var resume = function() {
-            a.play().then(function() { a.__playing = true; }).catch(function() {});
+            a.muted = true;
+            a.play().then(function() {
+              a.__playing = true;
+              setTimeout(function() { a.muted = false; }, 300);
+            }).catch(function() {});
             document.removeEventListener('click', resume);
             document.removeEventListener('touchstart', resume);
             document.removeEventListener('keydown', resume);

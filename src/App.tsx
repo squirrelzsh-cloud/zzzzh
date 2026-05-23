@@ -465,30 +465,40 @@ export default function App() {
           }
 
           if (!userPausedRef.current) {
-            // Try playing immediately — browser may allow it if user has engagement history
-            audio.play()
-              .then(() => {
-                setIsPlayingMusic(true);
-              })
-              .catch(() => {
-                // Blocked: wait for first user gesture
-                const onGesture = () => {
-                  if (userPausedRef.current) return;
-                  audio.play()
-                    .then(() => setIsPlayingMusic(true))
-                    .catch(() => {});
-                  window.removeEventListener("click", onGesture);
-                  window.removeEventListener("touchstart", onGesture);
-                  window.removeEventListener("wheel", onGesture);
-                  window.removeEventListener("keydown", onGesture);
-                };
-                window.addEventListener("click", onGesture, { passive: true });
-                window.addEventListener("touchstart", onGesture, { passive: true });
-                window.addEventListener("wheel", onGesture, { passive: true });
-                window.addEventListener("keydown", onGesture, { passive: true });
-                // Store for cleanup
-                (audio as any).__onGesture = onGesture;
-              });
+            if (!audio.paused) {
+              // Already playing (inline script succeeded)
+              setIsPlayingMusic(true);
+            } else {
+              // Muted-first: browsers allow muted autoplay, then unmute
+              audio.muted = true;
+              audio.play()
+                .then(() => {
+                  setIsPlayingMusic(true);
+                  setTimeout(() => { audio.muted = false; }, 300);
+                })
+                .catch(() => {
+                  // Blocked: wait for first user gesture
+                  const onGesture = () => {
+                    if (userPausedRef.current) return;
+                    audio.muted = true;
+                    audio.play()
+                      .then(() => {
+                        setIsPlayingMusic(true);
+                        setTimeout(() => { audio.muted = false; }, 300);
+                      })
+                      .catch(() => {});
+                    window.removeEventListener("click", onGesture);
+                    window.removeEventListener("touchstart", onGesture);
+                    window.removeEventListener("wheel", onGesture);
+                    window.removeEventListener("keydown", onGesture);
+                  };
+                  window.addEventListener("click", onGesture, { passive: true });
+                  window.addEventListener("touchstart", onGesture, { passive: true });
+                  window.addEventListener("wheel", onGesture, { passive: true });
+                  window.addEventListener("keydown", onGesture, { passive: true });
+                  (audio as any).__onGesture = onGesture;
+                });
+            }
           }
         }
 
