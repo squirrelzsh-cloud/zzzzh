@@ -18,6 +18,10 @@ interface MemoryCardProps {
 }
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&q=80";
+const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+const springConfig = isMobile
+  ? { type: "spring" as const, stiffness: 40, damping: 20, mass: 0.8 }
+  : { type: "spring" as const, stiffness: 85, damping: 15, mass: 1.1 };
 
 export function MemoryCard({
   memory,
@@ -103,12 +107,7 @@ export function MemoryCard({
         scale: isHovered ? scale * 1.12 : scale,
         opacity: opacity,
       }}
-      transition={{
-        type: "spring",
-        stiffness: 85,
-        damping: 15,
-        mass: 1.1,
-      }}
+      transition={springConfig}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={handleSingleClick}
@@ -149,6 +148,7 @@ export function MemoryCard({
         <img
           src={imgSrc}
           alt={memory.title}
+          loading="lazy"
           referrerPolicy="no-referrer"
           onError={() => setImgSrc(FALLBACK_IMAGE)}
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 select-none pointer-events-none rounded-xl"

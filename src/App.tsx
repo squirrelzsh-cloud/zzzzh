@@ -56,7 +56,7 @@ export default function App() {
   // Audio system controls
   const [isPlayingMusic, setIsPlayingMusic] = useState<boolean>(false);
   const [musicVolume, setMusicVolume] = useState<number>(0.04);
-  const [musicName, setMusicName] = useState<string>("纪念彼青春 - 钢琴背景曲 (Default)");
+  const [musicName, setMusicName] = useState<string>("111.mp3");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const userPausedRef = useRef<boolean>(false);
 
@@ -400,6 +400,11 @@ export default function App() {
         setCustomBgmUrlInput("");
         if (audioRef.current) {
           const audio = audioRef.current;
+          // Belt-and-suspenders: ensure src is always /media/111.mp3
+          if (audio.src !== initialMusicUrl) {
+            audio.src = initialMusicUrl;
+            audio.load();
+          }
 
           if (!userPausedRef.current) {
             if (!audio.paused) {
@@ -446,9 +451,12 @@ export default function App() {
       }
     }
 
-    initDBAndStorage();
-
+    // On mobile, delay the heavy init to let the canvas render first
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    const initDelay = isMobile ? 400 : 0;
+    const timer = setTimeout(() => initDBAndStorage(), initDelay);
     return () => {
+      clearTimeout(timer);
       if (audioRef.current) {
         const onGesture = (audioRef.current as any).__onGesture;
         if (onGesture) {
@@ -1642,9 +1650,8 @@ export default function App() {
                   <span className="block text-[10px] font-semibold text-stone-500 mb-1.5">🎵 选择内置舒缓背景音轨：</span>
                   <div className="grid grid-cols-1 gap-1.5">
                     {[
-                      { name: "纪念彼青春 - 钢琴背景曲 (Default)", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
-                      { name: "漫游彼校 - 轻盈弦乐曲", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
-                      { name: "静谧星河 - 温柔夜色颂", url: "/media/111.mp3" }
+                      { name: "静谧星河 - 温柔夜色颂 (Default)", url: "/media/111.mp3" },
+{ name: "静谧星河 - 温柔夜色颂", url: "/media/111.mp3" }
                     ].map((track) => (
                       <button
                         key={track.url}

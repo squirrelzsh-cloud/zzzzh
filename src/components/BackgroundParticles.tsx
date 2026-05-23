@@ -102,23 +102,24 @@ export function BackgroundParticles() {
 
     // Detect if the client is on a mobile platform
     const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-    
-    // Set dynamic particle load based on computing capacity to avoid browser crashing
-    // Mobile screen sizes are smaller, so 180 is very dense; Desktop gets a lush 500-particle canvas.
-    const count = isMobile ? 180 : 500;
+
+    // Set dynamic particle load based on computing capacity
+    const count = isMobile ? 50 : 500;
+    // Limit frame rate on mobile: only render every other frame (30fps vs 60fps)
+    let mobileFrameSkip = false;
     const hearts: Heart[] = [];
 
     // Pre-render high-fidelity glossy heart sprites to offscreen canvases
+    const offscreenSize = isMobile ? 32 : 64;
     const offscreenCanvases: HTMLCanvasElement[] = COLOR_SCHEMES.map((scheme) => {
       const offscreen = document.createElement("canvas");
-      // Scale offscreen base target size to keep graphics ultra-crisp
-      offscreen.width = 64;
-      offscreen.height = 64;
-      
+      offscreen.width = offscreenSize;
+      offscreen.height = offscreenSize;
+
       const octx = offscreen.getContext("2d");
       if (octx) {
         octx.save();
-        octx.translate(32, 32);
+        octx.translate(offscreenSize / 2, offscreenSize / 2);
 
         // Render soft blooming shadow glow
         octx.shadowColor = `rgba(${scheme.glowRgb}, 0.55)`;
@@ -126,9 +127,10 @@ export function BackgroundParticles() {
         octx.shadowOffsetX = 0;
         octx.shadowOffsetY = 2;
 
-        // Base heart dimensions in offscreen canvas space (approx. 24px wide/high)
-        const w = 24;
-        const h = 24;
+        // Scale heart dimensions based on offscreen canvas size (base: 24px on 64px canvas)
+        const scale = offscreenSize / 64;
+        const w = 24 * scale;
+        const h = 24 * scale;
 
         // Offset visual center of mass
         octx.translate(0, -h * 0.1);
@@ -207,6 +209,15 @@ export function BackgroundParticles() {
     let lastTime = performance.now();
 
     const render = (time: number) => {
+      // Mobile: skip every other frame to run at 30fps instead of 60fps
+      if (isMobile) {
+        mobileFrameSkip = !mobileFrameSkip;
+        if (mobileFrameSkip) {
+          animationFrameId = requestAnimationFrame(render);
+          return;
+        }
+      }
+
       const delta = (time - lastTime) / 1000;
       lastTime = time;
 
@@ -259,7 +270,7 @@ export function BackgroundParticles() {
         ctx.globalAlpha = currentOpacity;
 
         // Render scale math: map offscreen canvas dimensions back to desired scale
-        const drawSize = (h.maxSize / 24) * 64 * currentScale;
+        const drawSize = (h.maxSize / 24) * offscreenSize * currentScale;
 
         ctx.drawImage(
           offscreenCanvases[h.schemeIndex],
