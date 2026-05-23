@@ -1707,7 +1707,7 @@ export default function App() {
                     {[
                       { name: "纪念彼青春 - 钢琴背景曲 (Default)", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
                       { name: "漫游彼校 - 轻盈弦乐曲", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
-                      { name: "静谧星河 - 温柔夜色颂", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" }
+                      { name: "静谧星河 - 温柔夜色颂", url: "/media/111.mp3" }
                     ].map((track) => (
                       <button
                         key={track.url}
