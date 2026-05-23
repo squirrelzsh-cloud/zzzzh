@@ -270,14 +270,23 @@ export default function App() {
 
         let initialMemories: Memory[] = [];
         if (dbMemories.length > 0) {
-          initialMemories = dbMemories;
-          persistMemories(dbMemories);
+          // Merge Firestore data with CAMPUS_MEMORIES defaults: ensure all default cards exist
+          const firestoreIds = new Set(dbMemories.map(m => m.id));
+          const missingDefaults = CAMPUS_MEMORIES.filter(m => !firestoreIds.has(m.id));
+          initialMemories = [...dbMemories, ...missingDefaults];
+          persistMemories(initialMemories);
         } else {
           // Fallback to localStorage
           const txt = localStorage.getItem("zsh-memories-v4");
           if (txt) {
             try {
               initialMemories = JSON.parse(txt);
+              // Also merge with defaults for localStorage data
+              const localIds = new Set(initialMemories.map((m: Memory) => m.id));
+              const missing = CAMPUS_MEMORIES.filter(m => !localIds.has(m.id));
+              if (missing.length > 0) {
+                initialMemories = [...initialMemories, ...missing];
+              }
             } catch (e) {
               initialMemories = [...CAMPUS_MEMORIES];
             }
@@ -315,29 +324,51 @@ export default function App() {
         }
 
         // For each card, resolve IndexedDB Blobs for those prefixed with local:// or blob:
+        // Each card is resolved independently — one failing won't break the others
         const resolvedMemories = await Promise.all(
           initialMemories.map(async (m) => {
             let resImg = m.imageUrl || "";
             let resVid = m.videoUrl || "";
 
             if (resImg.startsWith("local://image-") || resImg.startsWith("blob:")) {
-              const b = await getMedia(`card-media-${m.id}-image`);
-              if (b) {
-                resImg = URL.createObjectURL(b);
-              } else {
+              try {
+                const b = await getMedia(`card-media-${m.id}-image`);
+                if (b && b.size > 0) {
+                  resImg = URL.createObjectURL(b);
+                } else {
+                  const originalDefault = CAMPUS_MEMORIES.find(x => x.id === m.id);
+                  resImg = originalDefault?.imageUrl || "";
+                }
+              } catch {
                 const originalDefault = CAMPUS_MEMORIES.find(x => x.id === m.id);
-                resImg = originalDefault?.imageUrl || "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&q=80";
+                resImg = originalDefault?.imageUrl || "";
               }
             }
 
+            // Final safety: if imageUrl is still empty or local://, use default
+            if (!resImg || resImg.startsWith("local://")) {
+              const originalDefault = CAMPUS_MEMORIES.find(x => x.id === m.id);
+              resImg = originalDefault?.imageUrl || "/media/image-m1.jpg";
+            }
+
             if (resVid.startsWith("local://video-") || resVid.startsWith("blob:")) {
-              const b = await getMedia(`card-media-${m.id}-video`);
-              if (b) {
-                resVid = URL.createObjectURL(b);
-              } else {
+              try {
+                const b = await getMedia(`card-media-${m.id}-video`);
+                if (b && b.size > 0) {
+                  resVid = URL.createObjectURL(b);
+                } else {
+                  const originalDefault = CAMPUS_MEMORIES.find(x => x.id === m.id);
+                  resVid = originalDefault?.videoUrl || "";
+                }
+              } catch {
                 const originalDefault = CAMPUS_MEMORIES.find(x => x.id === m.id);
                 resVid = originalDefault?.videoUrl || "";
               }
+            }
+
+            if (resVid.startsWith("local://")) {
+              const originalDefault = CAMPUS_MEMORIES.find(x => x.id === m.id);
+              resVid = originalDefault?.videoUrl || "";
             }
 
             return {
@@ -413,16 +444,72 @@ export default function App() {
 
         setMusicName(initialMusicName);
         if (audioRef.current) {
-          audioRef.current.src = initialMusicUrl;
-          audioRef.current.load();
-          if (!userPausedRef.current) {
-            audioRef.current.play()
+          const audio = audioRef.current;
+
+          // Only change src if it differs from what's already set (avoids interrupting playback)
+          const currentSrc = audio.src || "";
+          const needSrcChange = !currentSrc.endsWith(initialMusicUrl.split("/").pop() || "")
+            && initialMusicUrl !== "/media/111.mp3";
+
+          if (needSrcChange || !currentSrc) {
+            audio.src = initialMusicUrl;
+            audio.load();
+          }
+
+          // Setup gesture fallback for browsers that block autoplay
+          const startPlayback = () => {
+            if (userPausedRef.current) return;
+            audio.play()
               .then(() => {
                 setIsPlayingMusic(true);
+                cleanUpListeners();
               })
-              .catch((err) => {
-                console.log("Initial autoplay on loaded src blocked, waiting for next user gesture", err);
-              });
+              .catch(() => {});
+          };
+
+          const cleanUpListeners = () => {
+            window.removeEventListener("click", startPlayback);
+            window.removeEventListener("touchstart", startPlayback);
+            window.removeEventListener("wheel", startPlayback);
+            window.removeEventListener("keydown", startPlayback);
+          };
+
+          if (!userPausedRef.current) {
+            // Wait for audio to be ready before attempting play
+            const tryPlay = () => {
+              audio.play()
+                .then(() => {
+                  setIsPlayingMusic(true);
+                  audio.removeEventListener("canplay", tryPlay);
+                  audio.removeEventListener("loadeddata", tryPlay);
+                })
+                .catch(() => {
+                  // Browser blocked autoplay — set up gesture capture
+                  window.addEventListener("click", startPlayback, { passive: true });
+                  window.addEventListener("touchstart", startPlayback, { passive: true });
+                  window.addEventListener("wheel", startPlayback, { passive: true });
+                  window.addEventListener("keydown", startPlayback, { passive: true });
+                  audio.removeEventListener("canplay", tryPlay);
+                  audio.removeEventListener("loadeddata", tryPlay);
+                });
+            };
+
+            if (audio.readyState >= 2) {
+              // Already have enough data
+              tryPlay();
+            } else {
+              audio.addEventListener("canplay", tryPlay, { once: false });
+              audio.addEventListener("loadeddata", tryPlay, { once: false });
+              // Safety timeout: if canplay never fires, try anyway
+              setTimeout(() => {
+                if (!userPausedRef.current && audio.readyState >= 1) {
+                  tryPlay();
+                }
+              }, 2000);
+            }
+
+            // Store cleanup for the init effect's return
+            (audio as any).__cleanupListeners = cleanUpListeners;
           }
         }
 
@@ -434,47 +521,12 @@ export default function App() {
     }
 
     initDBAndStorage();
-  }, []);
-
-  // 3b. Interactive Background Music Autoplay & First-Gesture Capture Engine
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const startPlayback = () => {
-      if (userPausedRef.current) return;
-      audio.play()
-        .then(() => {
-          setIsPlayingMusic(true);
-          cleanUpListeners();
-        })
-        .catch((err) => {
-          console.log("Autoplay wait: user action required", err);
-        });
-    };
-
-    const cleanUpListeners = () => {
-      window.removeEventListener("click", startPlayback);
-      window.removeEventListener("touchstart", startPlayback);
-      window.removeEventListener("wheel", startPlayback);
-      window.removeEventListener("keydown", startPlayback);
-    };
-
-    // Try playing immediately
-    audio.play()
-      .then(() => {
-        setIsPlayingMusic(true);
-      })
-      .catch(() => {
-        // If modern browser policies block immediate play, capture the very first simple user gesture
-        window.addEventListener("click", startPlayback, { passive: true });
-        window.addEventListener("touchstart", startPlayback, { passive: true });
-        window.addEventListener("wheel", startPlayback, { passive: true });
-        window.addEventListener("keydown", startPlayback, { passive: true });
-      });
 
     return () => {
-      cleanUpListeners();
+      if (audioRef.current) {
+        const cleanup = (audioRef.current as any).__cleanupListeners;
+        if (cleanup) cleanup();
+      }
     };
   }, []);
 
@@ -796,6 +848,8 @@ export default function App() {
     const updatedMemory = {
       ...baseMemory,
       ...editForm,
+      // Prevent empty imageUrl from overwriting a valid existing one
+      imageUrl: editForm.imageUrl || baseMemory.imageUrl,
       videoUrl: editForm.videoUrl || ""
     };
 

@@ -1,4 +1,4 @@
-import React, { useState, MouseEvent } from "react";
+import React, { useEffect, useState, MouseEvent } from "react";
 import { motion } from "motion/react";
 import { Memory } from "../data";
 import { Play, Image as ImageIcon, MapPin, Calendar, Heart } from "lucide-react";
@@ -17,6 +17,8 @@ interface MemoryCardProps {
   activeStageId?: string;
 }
 
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&q=80";
+
 export function MemoryCard({
   memory,
   x,
@@ -31,7 +33,13 @@ export function MemoryCard({
 }: MemoryCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [imgSrc, setImgSrc] = useState(memory.imageUrl);
   const [floatingHearts, setFloatingHearts] = useState<{ id: number; x: number; scale: number; rotate: number }[]>([]);
+
+  // Sync imgSrc when memory.imageUrl changes externally
+  useEffect(() => {
+    setImgSrc(memory.imageUrl);
+  }, [memory.imageUrl]);
 
   // Determine media badge — treat empty string as no video
   const hasVideo = !!(memory.videoUrl && memory.videoUrl.trim() !== "");
@@ -139,9 +147,10 @@ export function MemoryCard({
         >
         {/* Main Image */}
         <img
-          src={memory.imageUrl}
+          src={imgSrc}
           alt={memory.title}
           referrerPolicy="no-referrer"
+          onError={() => setImgSrc(FALLBACK_IMAGE)}
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 select-none pointer-events-none rounded-xl"
         />
 
